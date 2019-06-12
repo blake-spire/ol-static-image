@@ -1,3 +1,4 @@
+import React from "react";
 import Map from "ol/Map.js";
 import View from "ol/View.js";
 import { getCenter } from "ol/extent.js";
@@ -5,77 +6,93 @@ import ImageLayer from "ol/layer/Image.js";
 import Projection from "ol/proj/Projection.js";
 import Static from "ol/source/ImageStatic.js";
 
-const loadImage = src => {
-  return new Promise((resolve, reject) => {
-    const img = new Image();
+class MapComponent extends React.Component {
+  constructor(props) {
+    super(props);
+    this.mapRef = React.createRef();
+  }
 
-    img.addEventListener("load", () => {
-      return resolve(img);
+  loadImage = src => {
+    return new Promise((resolve, reject) => {
+      const img = new Image();
+
+      img.addEventListener("load", () => {
+        return resolve(img);
+      });
+
+      img.addEventListener("error", () => {
+        return reject("cannot load image");
+      });
+
+      img.src = src;
     });
-
-    img.addEventListener("error", () => {
-      return reject("cannot load image");
-    });
-
-    img.src = src;
-  });
-};
-
-const getImageDimensions = img => {
-  const container = document.querySelector(".map");
-  const imageAspectRatio = img.naturalWidth / img.naturalHeight;
-  const canvasAspectRatio = container.offsetWidth / container.offsetHeight;
-  const renderableWidth =
-    imageAspectRatio < canvasAspectRatio
-      ? img.naturalWidth * (container.offsetHeight / img.naturalHeight)
-      : container.offsetWidth;
-  const renderableHeight =
-    imageAspectRatio > canvasAspectRatio
-      ? img.naturalHeight * (container.offsetWidth / img.naturalWidth)
-      : container.offsetHeight;
-
-  return {
-    width: renderableWidth,
-    height: renderableHeight,
   };
-};
 
-loadImage("https://imgs.xkcd.com/comics/online_communities.png").then(img => {
-  const { width, height } = getImageDimensions(img);
-  const extent = [0, 0, width, height];
-  const projection = new Projection({
-    extent,
-    units: "pixels",
-    code: new Date().toString(),
-  });
+  getImageDimensions = img => {
+    const {
+      offsetHeight: containerHeight,
+      offsetWidth: containerWidth,
+    } = this.mapRef.current;
 
-  new Map({
-    target: "map",
-    view: new View({
-      projection,
-      center: getCenter(extent),
-      maxResolution: 2,
-      minResolution: 0.25,
-      resolution: 1,
-    }),
-    layers: [
-      new ImageLayer({
-        source: new Static({
-          projection,
-          imageExtent: extent,
-          url: img.src,
-        }),
-      }),
-    ],
-  });
-});
+    const containerAspectRatio = containerWidth / containerHeight;
+    const imageAspectRatio = img.naturalWidth / img.naturalHeight;
+    const width =
+      imageAspectRatio < containerAspectRatio
+        ? img.naturalWidth * (containerHeight / img.naturalHeight)
+        : containerWidth;
+    const height =
+      imageAspectRatio > containerAspectRatio
+        ? img.naturalHeight * (containerWidth / img.naturalWidth)
+        : containerHeight;
 
-const Map = props => {
-  return (
-    <section className="map">
-      <div id="map" />
-    </section>
-  );
-};
+    // safety check
+    return {
+      width: width > 0 ? width : img.naturalWidth,
+      height: height > 0 ? height : img.naturalHeight,
+    };
+  };
 
-export default Map;
+  componentDidMount() {
+    this.loadImage("https://imgs.xkcd.com/comics/online_communities.png").then(
+      img => {
+        const { width, height } = this.getImageDimensions(img);
+        console.log(width, height);
+
+        const extent = [0, 0, width, height];
+        const projection = new Projection({
+          extent,
+          units: "pixels",
+          code: new Date().toString(),
+        });
+
+        new Map({
+          target: "map",
+          view: new View({
+            projection,
+            center: getCenter(extent),
+            resolution: 1,
+          }),
+          layers: [
+            new ImageLayer({
+              source: new Static({
+                projection,
+                imageExtent: extent,
+                url: img.src,
+              }),
+            }),
+          ],
+        });
+      }
+    );
+  }
+
+  render() {
+    return (
+      <section className="map">
+        <div id="map" ref={this.mapRef} />
+      </section>
+    );
+  }
+}
+
+export default MapComponent;
